@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Replacement Algorithm Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .input-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .stat-box {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .hit {
+            background-color: #d4edda;
+        }
+        .fault {
+            background-color: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Page Replacement Algorithm Calculator</h1>
+        
+        <div class="input-section">
+            <label for="reference-string">Reference String:</label>
+            <input type="text" id="reference-string" placeholder="Enter numbers separated by spaces (e.g., 1 2 3 4 1 2 5 1 2 3 4)">
+            <button id="generate-random">Generate Random String</button>
+            
+            <label for="frame-size">Number of Frames:</label>
+            <input type="number" id="frame-size" min="1" value="3">
+            
+            <label for="algorithm">Algorithm:</label>
+            <select id="algorithm">
+                <option value="fifo">FIFO</option>
+                <option value="lru">LRU</option>
+                <option value="optimal">Optimal</option>
+            </select>
+            
+            <button id="calculate-btn">Calculate</button>
+            <button id="clear-btn">Clear</button>
+        </div>
+        
+        <div class="results" id="results" style="display: none;">
+            <h2>Results</h2>
+            <div class="stats">
+                <div class="stat-box">
+                    <h3>Page Faults:</h3>
+                    <div id="page-faults">0</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Page Hits:</h3>
+                    <div id="page-hits">0</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Miss Ratio:</h3>
+                    <div id="miss-ratio">0%</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Hit Ratio:</h3>
+                    <div id="hit-ratio">0%</div>
+                </div>
+            </div>
+            
+            <h3>Page Replacement Process:</h3>
+            <div id="visualization">
+                <!-- Table will be generated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const calculateBtn = document.getElementById('calculate-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const generateRandomBtn = document.getElementById('generate-random');
+            const referenceStringInput = document.getElementById('reference-string');
+            
+            // Add blur event listener to format the input
+            referenceStringInput.addEventListener('blur', function() {
+                const input = referenceStringInput.value.trim();
+                if (input) {
+                    // Replace commas with spaces and normalize spaces
+                    const formattedInput = input.replace(/,/g, ' ').replace(/\s+/g, ' ');
+                    referenceStringInput.value = formattedInput;
+                }
+            });
+            
+            generateRandomBtn.addEventListener('click', function() {
+                const length = Math.floor(Math.random() * 10) + 10; // Random length between 10-19
+                const maxPage = 9;
+                let randomString = [];
+                
+                for (let i = 0; i < length; i++) {
+                    randomString.push(Math.floor(Math.random() * maxPage));
+                }
+                
+                document.getElementById('reference-string').value = randomString.join(' ');
+            });
+            
+            calculateBtn.addEventListener('click', function() {
+                const referenceString = document.getElementById('reference-string').value.trim().split(/\s+/).map(Number);
+                const frameSize = parseInt(document.getElementById('frame-size').value);
+                
+                if (referenceString.length === 0 || isNaN(frameSize) || frameSize <= 0) {
+                    alert('Please enter a valid reference string and frame size.');
+                    return;
+                }
+                
+                const result = calculatePageFaults(referenceString, frameSize);
+                displayResults(result, referenceString, frameSize);
+            });
+            
+            clearBtn.addEventListener('click', function() {
+                document.getElementById('reference-string').value = '';
+                document.getElementById('frame-size').value = '3';
+                document.getElementById('results').style.display = 'none';
+            });
+        });
+        
+        function calculatePageFaults(referenceString, frameSize) {
+            const algorithm = document.getElementById('algorithm').value;
+            
+            switch(algorithm) {
+                case 'fifo':
+                    return calculateFIFO(referenceString, frameSize);
+                case 'lru':
+                    return calculateLRU(referenceString, frameSize);
+                case 'optimal':
+                    return calculateOptimal(referenceString, frameSize);
+                default:
+                    return calculateFIFO(referenceString, frameSize);
+            }
+        }
+        
+        function calculateFIFO(referenceString, frameSize) {
+            const frames = Array(frameSize).fill(-1); // Initialize with empty frames
+            const frameHistory = [];
+            const status = [];
+            
+            let pageFaults = 0;
+            let pointer = 0; // For FIFO replacement
+            
+            for (let i = 0; i < referenceString.length; i++) {
+                const page = referenceString[i];
+                
+                // Check if page is already in frames (hit)
+                if (frames.includes(page)) {
+                    status.push(true); // true for hit
+                } else {
+                    // Page fault
+                    pageFaults++;
+                    status.push(false); // false for fault
+                    frames[pointer] = page;
+                    pointer = (pointer + 1) % frameSize; // FIFO replacement
+                }
+                
+                // Save current frame state
+                frameHistory.push([...frames]);
+            }
+            
+            const pageHits = referenceString.length - pageFaults;
+            const hitRatio = (pageHits / referenceString.length) * 100;
+            const missRatio = (pageFaults / referenceString.length) * 100;
+            
+            return {
+                pageFaults,
+                pageHits,
+                hitRatio,
+                missRatio,
+                frameHistory,
+                status
+            };
+        }
+        
+        function calculateLRU(referenceString, frameSize) {
+            const frames = Array(frameSize).fill(-1); // Initialize with empty frames
+            const frameHistory = [];
+            const status = [];
+            const recentlyUsed = Array(frameSize).fill(-1); // To track when each page was used
+            
+            let pageFaults = 0;
+            
+            for (let i = 0; i < referenceString.length; i++) {
+                const page = referenceString[i];
+                
+                // Check if page is already in frames (hit)
+                if (frames.includes(page)) {
+                    status.push(true); // true for hit
+                    // Update recently used time for this page
+                    recentlyUsed[frames.indexOf(page)] = i;
+                } else {
+                    // Page fault
+                    pageFaults++;
+                    status.push(false); // false for fault
+                    
+                    // If there's an empty frame, use it
+                    if (frames.includes(-1)) {
+                        const emptyFrameIndex = frames.indexOf(-1);
+                        frames[emptyFrameIndex] = page;
+                        recentlyUsed[emptyFrameIndex] = i;
+                    } else {
+                        // Find the least recently used page
+                        let lruIndex = 0;
+                        for (let j = 1; j < frameSize; j++) {
+                            if (recentlyUsed[j] < recentlyUsed[lruIndex]) {
+                                lruIndex = j;
+                            }
+                        }
+                        
+                        frames[lruIndex] = page;
+                        recentlyUsed[lruIndex] = i;
+                    }
+                }
+                
+                // Save current frame state
+                frameHistory.push([...frames]);
+            }
+            
+            const pageHits = referenceString.length - pageFaults;
+            const hitRatio = (pageHits / referenceString.length) * 100;
+            const missRatio = (pageFaults / referenceString.length) * 100;
+            
+            return {
+                pageFaults,
+                pageHits,
+                hitRatio,
+                missRatio,
+                frameHistory,
+                status
+            };
+        }
+        
+        function calculateOptimal(referenceString, frameSize) {
+            const frames = Array(frameSize).fill(-1); // Initialize with empty frames
+            const frameHistory = [];
+            const status = [];
+            
+            let pageFaults = 0;
+            
+            for (let i = 0; i < referenceString.length; i++) {
+                const page = referenceString[i];
+                
+                // Check if page is already in frames (hit)
+                if (frames.includes(page)) {
+                    status.push(true); // true for hit
+                } else {
+                    // Page fault
+                    pageFaults++;
+                    status.push(false); // false for fault
+                    
+                    // If there's an empty frame, use it
+                    if (frames.includes(-1)) {
+                        const emptyFrameIndex = frames.indexOf(-1);
+                        frames[emptyFrameIndex] = page;
+                    } else {
+                        // Find the page that won't be used for the longest time in future
+                        const nextUseIndex = frames.map(frame => {
+                            const nextUse = referenceString.findIndex((p, index) => index > i && p === frame);
+                            return nextUse !== -1 ? nextUse : Infinity; // If page is not used again, mark as Infinity
+                        });
+                        
+                        // Find the index with the maximum next use (or Infinity)
+                        const optimalReplaceIndex = nextUseIndex.indexOf(Math.max(...nextUseIndex));
+                        frames[optimalReplaceIndex] = page;
+                    }
+                }
+                
+                // Save current frame state
+                frameHistory.push([...frames]);
+            }
+            
+            const pageHits = referenceString.length - pageFaults;
+            const hitRatio = (pageHits / referenceString.length) * 100;
+            const missRatio = (pageFaults / referenceString.length) * 100;
+            
+            return {
+                pageFaults,
+                pageHits,
+                hitRatio,
+                missRatio,
+                frameHistory,
+                status
+            };
+        }
+        
+        function displayResults(result, referenceString, frameSize) {
+            // Display statistics
+            document.getElementById('page-faults').textContent = result.pageFaults;
+            document.getElementById('page-hits').textContent = result.pageHits;
+            document.getElementById('hit-ratio').textContent = result.hitRatio.toFixed(2) + '%';
+            document.getElementById('miss-ratio').textContent = result.missRatio.toFixed(2) + '%';
+            
+            // Create visualization table
+            const visualizationDiv = document.getElementById('visualization');
+            visualizationDiv.innerHTML = '';
+            
+            const table = document.createElement('table');
+            
+            // Create header row with reference string
+            const headerRow = document.createElement('tr');
+            const emptyCell = document.createElement('th');
+            emptyCell.textContent = 'Reference →';
+            headerRow.appendChild(emptyCell);
+            
+            for (let i = 0; i < referenceString.length; i++) {
+                const cell = document.createElement('th');
+                cell.textContent = referenceString[i];
+                headerRow.appendChild(cell);
+            }
+            table.appendChild(headerRow);
+            
+            // Create rows for each frame
+            for (let i = 0; i < frameSize; i++) {
+                const row = document.createElement('tr');
+                const frameLabel = document.createElement('td');
+                frameLabel.textContent = `Frame ${i+1}`;
+                frameLabel.style.fontWeight = 'bold';
+                row.appendChild(frameLabel);
+                
+                // Add states for each step
+                for (let j = 0; j < result.frameHistory.length; j++) {
+                    const cell = document.createElement('td');
+                    cell.textContent = result.frameHistory[j][i] === -1 ? '-' : result.frameHistory[j][i];
+                    row.appendChild(cell);
+                }
+                
+                table.appendChild(row);
+            }
+            
+            // Add hit/fault status row
+            const statusRow = document.createElement('tr');
+            const statusLabel = document.createElement('td');
+            statusLabel.textContent = 'Status';
+            statusLabel.style.fontWeight = 'bold';
+            statusRow.appendChild(statusLabel);
+            
+            for (let i = 0; i < result.status.length; i++) {
+                const cell = document.createElement('td');
+                if (result.status[i]) {
+                    cell.textContent = 'Hit';
+                    cell.className = 'hit';
+                } else {
+                    cell.textContent = 'Fault';
+                    cell.className = 'fault';
+                }
+                statusRow.appendChild(cell);
+            }
+            table.appendChild(statusRow);
+            
+            visualizationDiv.appendChild(table);
+            document.getElementById('results').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
